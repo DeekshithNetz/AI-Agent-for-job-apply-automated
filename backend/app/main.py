@@ -114,6 +114,18 @@ async def apply_to_job(
             page_content,
             profile_data
         )
+        print("3333333333333333333333333333")
+        print("FILE INPUTS:", await browser.page.locator('input[type="file"]').count())
+
+        print(
+            "ALL INPUTS:",
+            await browser.page.locator("input").count()
+        )
+
+        print(
+            "BUTTONS:",
+            await browser.page.locator("button").all_text_contents()
+        )
 
         results = await execute_form(
             browser.page,

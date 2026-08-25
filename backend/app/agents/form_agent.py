@@ -82,37 +82,164 @@ async def execute_form(page, fields, resume_path=None):
             })
             continue
 
-        # -------------------------
-        # FILE / RESUME
-        # -------------------------
-        if field_type == "file":
+        try:
 
-            if not resume_path:
-                results.append({
-                    "field": description,
-                    "status": "resume_not_available"
-                })
+            # =========================================
+            # RESUME / FILE
+            # =========================================
+
+            # =========================================
+            # RESUME / FILE UPLOAD
+            # =========================================
+
+            if field_type == "file":
+
+                if not resume_path:
+                    results.append({
+                        "field": description,
+                        "status": "resume_not_available"
+                    })
+                    continue
+
+                try:
+
+                    file_inputs = page.locator(
+                        'input[type="file"]'
+                    )
+
+                    count = await file_inputs.count()
+
+                    print("Detected file inputs:", count)
+                    print("Resume path:", resume_path)
+
+                    if count == 0:
+                        results.append({
+                            "field": description,
+                            "status": "upload_field_not_found"
+                        })
+                        continue
+
+                    uploaded = False
+
+                    for i in range(count):
+
+                        file_input = file_inputs.nth(i)
+
+                        try:
+
+                            await file_input.set_input_files(
+                                resume_path
+                            )
+
+                            print(
+                                f"Resume uploaded using file input {i}"
+                            )
+
+                            uploaded = True
+                            break
+
+                        except Exception as e:
+
+                            print(
+                                f"File input {i} failed:",
+                                str(e)
+                            )
+
+                    results.append({
+                        "field": description,
+                        "status": (
+                            "uploaded"
+                            if uploaded
+                            else "upload_failed"
+                        )
+                    })
+
+                except Exception as e:
+
+                    results.append({
+                        "field": description,
+                        "status": "upload_failed",
+                        "error": str(e)
+                    })
+
                 continue
 
-            try:
+            # =========================================
+            # CHECKBOX
+            # =========================================
 
-                file_inputs = page.locator(
-                    'input[type="file"]'
-                )
+            if field_type == "checkbox":
 
-                count = await file_inputs.count()
+                locator = page.get_by_label(
+                    description,
+                    exact=False
+                ).first
 
-                uploaded = False
+                if await locator.count() > 0:
+
+                    if not await locator.is_checked():
+                        await locator.check()
+
+                    results.append({
+                        "field": description,
+                        "status": "checked"
+                    })
+
+                else:
+
+                    # fallback
+                    checkboxes = page.locator(
+                        'input[type="checkbox"]'
+                    )
+
+                    if await checkboxes.count() > 0:
+
+                        await checkboxes.first.check()
+
+                        results.append({
+                            "field": description,
+                            "status": "checked"
+                        })
+
+                    else:
+
+                        results.append({
+                            "field": description,
+                            "status": "checkbox_not_found"
+                        })
+
+                continue
+
+            # =========================================
+            # SELECT / DROPDOWN
+            # =========================================
+
+            if field_type in [
+                "select",
+                "dropdown"
+            ]:
+
+                if value is None:
+                    results.append({
+                        "field": description,
+                        "status": "no_value"
+                    })
+                    continue
+
+                selects = page.locator("select")
+
+                count = await selects.count()
+
+                found = False
 
                 for i in range(count):
 
-                    element = file_inputs.nth(i)
+                    select = selects.nth(i)
 
-                    attrs = await element.evaluate("""
+                    attrs = await select.evaluate("""
                         el => ({
                             name: el.name || "",
                             id: el.id || "",
-                            accept: el.accept || "",
                             aria: el.getAttribute("aria-label") || ""
                         })
                     """)
@@ -122,89 +249,102 @@ async def execute_form(page, fields, resume_path=None):
                         for v in attrs.values()
                     )
 
-                    if (
-                        "resume" in text
-                        or "cv" in text
-                        or "curriculum" in text
-                        or "pdf" in text
+                    if any(
+                        word.lower() in text
+                        for word in description.split()
+                        if len(word) > 3
                     ):
 
-                        await element.set_input_files(
-                            resume_path
-                        )
+                        options = await select.locator(
+                            "option"
+                        ).all_text_contents()
 
-                        uploaded = True
-                        break
+                        matching = None
+
+                        for option in options:
+
+                            if str(value).lower() in option.lower():
+                                matching = option
+                                break
+
+                        if matching:
+
+                            await select.select_option(
+                                label=matching
+                            )
+
+                            found = True
+
+                            break
 
                 results.append({
                     "field": description,
                     "status": (
-                        "uploaded"
-                        if uploaded
-                        else "upload_field_not_found"
+                        "selected"
+                        if found
+                        else "dropdown_not_found"
                     )
                 })
 
-            except Exception as e:
-
-                results.append({
-                    "field": description,
-                    "status": "upload_failed",
-                    "error": str(e)
-                })
-
-            continue
-
-        # -------------------------
-        # CHECKBOX
-        # -------------------------
-        if field_type == "checkbox":
-
-            try:
-
-                checkbox = page.get_by_label(
-                    description,
-                    exact=False
-                ).first
-
-                if await checkbox.count() > 0:
-
-                    if not await checkbox.is_checked():
-                        await checkbox.check()
-
-                    results.append({
-                        "field": description,
-                        "status": "checked"
-                    })
-
-                else:
-
-                    results.append({
-                        "field": description,
-                        "status": "checkbox_not_found"
-                    })
-
-            except Exception as e:
-
-                results.append({
-                    "field": description,
-                    "status": "checkbox_failed",
-                    "error": str(e)
-                })
-
-            continue
-
-        # -------------------------
-        # TEXT / TEXTAREA
-        # -------------------------
-        if field_type in ["text", "textarea"]:
-
-            if value is None:
                 continue
 
-            try:
+            # =========================================
+            # RADIO BUTTON
+            # =========================================
 
-                # First try label
+            if field_type == "radio":
+
+                if value is None:
+                    continue
+
+                try:
+
+                    radio = page.get_by_label(
+                        str(value),
+                        exact=False
+                    ).first
+
+                    if await radio.count() > 0:
+
+                        await radio.check()
+
+                        results.append({
+                            "field": description,
+                            "status": "selected"
+                        })
+
+                    else:
+
+                        results.append({
+                            "field": description,
+                            "status": "radio_not_found"
+                        })
+
+                except Exception as e:
+
+                    results.append({
+                        "field": description,
+                        "status": "radio_failed",
+                        "error": str(e)
+                    })
+
+                continue
+
+            # =========================================
+            # TEXT / TEXTAREA
+            # =========================================
+
+            if field_type in [
+                "text",
+                "textarea",
+                "email",
+                "tel",
+                "number"
+            ]:
+
+                if value is None:
+                    continue
+
                 locator = page.get_by_label(
                     description,
                     exact=False
@@ -223,16 +363,16 @@ async def execute_form(page, fields, resume_path=None):
 
                     continue
 
-                # Fallback: inspect inputs
-                locator = page.locator(
+                # fallback
+                elements = page.locator(
                     "input, textarea"
                 )
 
-                count = await locator.count()
+                count = await elements.count()
 
                 found = False
 
-                words = [
+                keywords = [
                     word.lower()
                     for word in description.split()
                     if len(word) > 3
@@ -240,7 +380,7 @@ async def execute_form(page, fields, resume_path=None):
 
                 for i in range(count):
 
-                    element = locator.nth(i)
+                    element = elements.nth(i)
 
                     attrs = await element.evaluate("""
                         el => ({
@@ -257,8 +397,8 @@ async def execute_form(page, fields, resume_path=None):
                     )
 
                     if any(
-                        word in text
-                        for word in words
+                        keyword in text
+                        for keyword in keywords
                     ):
 
                         await element.fill(
@@ -277,12 +417,24 @@ async def execute_form(page, fields, resume_path=None):
                     )
                 })
 
-            except Exception as e:
+                continue
 
-                results.append({
-                    "field": description,
-                    "status": "fill_failed",
-                    "error": str(e)
-                })
+            # =========================================
+            # UNKNOWN FIELD
+            # =========================================
+
+            results.append({
+                "field": description,
+                "status": "unsupported_field_type",
+                "type": field_type
+            })
+
+        except Exception as e:
+
+            results.append({
+                "field": description,
+                "status": "failed",
+                "error": str(e)
+            })
 
     return results
