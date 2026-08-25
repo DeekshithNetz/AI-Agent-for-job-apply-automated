@@ -70,26 +70,11 @@ async def execute_form(page, fields, resume_path=None):
 
     for field in fields:
 
-        description = field.get(
-            "field_description",
-            ""
-        )
+        description = field.get("field_description", "")
+        field_type = field.get("field_type", "")
+        value = field.get("value")
+        confidence = field.get("confidence", 0)
 
-        field_type = field.get(
-            "field_type",
-            ""
-        )
-
-        value = field.get(
-            "value"
-        )
-
-        confidence = field.get(
-            "confidence",
-            0
-        )
-
-        # Don't blindly interact with low-confidence fields
         if confidence < 0.70:
             results.append({
                 "field": description,
@@ -97,75 +82,82 @@ async def execute_form(page, fields, resume_path=None):
             })
             continue
 
-        # Resume
+        # -------------------------
+        # FILE / RESUME
+        # -------------------------
         if field_type == "file":
 
-            if resume_path:
+            if not resume_path:
+                results.append({
+                    "field": description,
+                    "status": "resume_not_available"
+                })
+                continue
 
-                try:
+            try:
 
-                    inputs = page.locator(
-                        'input[type="file"]'
+                file_inputs = page.locator(
+                    'input[type="file"]'
+                )
+
+                count = await file_inputs.count()
+
+                uploaded = False
+
+                for i in range(count):
+
+                    element = file_inputs.nth(i)
+
+                    attrs = await element.evaluate("""
+                        el => ({
+                            name: el.name || "",
+                            id: el.id || "",
+                            accept: el.accept || "",
+                            aria: el.getAttribute("aria-label") || ""
+                        })
+                    """)
+
+                    text = " ".join(
+                        str(v).lower()
+                        for v in attrs.values()
                     )
 
-                    count = await inputs.count()
+                    if (
+                        "resume" in text
+                        or "cv" in text
+                        or "curriculum" in text
+                        or "pdf" in text
+                    ):
 
-                    uploaded = False
-
-                    for i in range(count):
-
-                        element = inputs.nth(i)
-
-                        attrs = await element.evaluate(
-                            """
-                            el => ({
-                                name: el.name || "",
-                                id: el.id || "",
-                                accept: el.accept || "",
-                                aria: el.getAttribute("aria-label") || ""
-                            })
-                            """
+                        await element.set_input_files(
+                            resume_path
                         )
 
-                        text = " ".join(
-                            str(v).lower()
-                            for v in attrs.values()
-                        )
+                        uploaded = True
+                        break
 
-                        if (
-                            "resume" in text
-                            or "cv" in text
-                            or "curriculum" in text
-                            or "pdf" in text
-                        ):
+                results.append({
+                    "field": description,
+                    "status": (
+                        "uploaded"
+                        if uploaded
+                        else "upload_field_not_found"
+                    )
+                })
 
-                            await element.set_input_files(
-                                resume_path
-                            )
+            except Exception as e:
 
-                            uploaded = True
-                            break
-
-                    results.append({
-                        "field": description,
-                        "status": (
-                            "uploaded"
-                            if uploaded
-                            else "upload_failed"
-                        )
-                    })
-
-                except Exception as e:
-
-                    results.append({
-                        "field": description,
-                        "status": "upload_failed",
-                        "error": str(e)
-                    })
+                results.append({
+                    "field": description,
+                    "status": "upload_failed",
+                    "error": str(e)
+                })
 
             continue
 
-        # Checkbox
+        # -------------------------
+        # CHECKBOX
+        # -------------------------
         if field_type == "checkbox":
 
             try:
@@ -185,6 +177,13 @@ async def execute_form(page, fields, resume_path=None):
                         "status": "checked"
                     })
 
+                else:
+
+                    results.append({
+                        "field": description,
+                        "status": "checkbox_not_found"
+                    })
+
             except Exception as e:
 
                 results.append({
@@ -195,7 +194,9 @@ async def execute_form(page, fields, resume_path=None):
 
             continue
 
-        # Text / textarea
+        # -------------------------
+        # TEXT / TEXTAREA
+        # -------------------------
         if field_type in ["text", "textarea"]:
 
             if value is None:
@@ -203,6 +204,7 @@ async def execute_form(page, fields, resume_path=None):
 
             try:
 
+                # First try label
                 locator = page.get_by_label(
                     description,
                     exact=False
@@ -221,7 +223,7 @@ async def execute_form(page, fields, resume_path=None):
 
                     continue
 
-                # fallback
+                # Fallback: inspect inputs
                 locator = page.locator(
                     "input, textarea"
                 )
@@ -230,33 +232,34 @@ async def execute_form(page, fields, resume_path=None):
 
                 found = False
 
+                words = [
+                    word.lower()
+                    for word in description.split()
+                    if len(word) > 3
+                ]
+
                 for i in range(count):
 
                     element = locator.nth(i)
 
-                    attrs = await element.evaluate(
-                        """
+                    attrs = await element.evaluate("""
                         el => ({
                             name: el.name || "",
                             id: el.id || "",
                             placeholder: el.placeholder || "",
                             aria: el.getAttribute("aria-label") || ""
                         })
-                        """
-                    )
+                    """)
 
                     text = " ".join(
                         str(v).lower()
                         for v in attrs.values()
                     )
 
-                    words = [
-                        w.lower()
-                        for w in description.split()
-                        if len(w) > 3
-                    ]
-
-                    if any(word in text for word in words):
+                    if any(
+                        word in text
+                        for word in words
+                    ):
 
                         await element.fill(
                             str(value)

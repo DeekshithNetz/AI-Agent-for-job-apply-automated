@@ -16,7 +16,7 @@ from app.models.application import Application
 from app.schemas.profile import ProfileCreate
 
 from app.browser.browser import Browser
-from app.agents.form_agent import analyze_form
+from app.agents.form_agent import analyze_form, execute_form
 
 
 Base.metadata.create_all(bind=engine)
@@ -79,8 +79,8 @@ async def apply_to_job(
     ).first()
 
     if not profile:
-
         return {
+            "status": "failed",
             "error": "Profile not found"
         }
 
@@ -115,19 +115,49 @@ async def apply_to_job(
             profile_data
         )
 
+        results = await execute_form(
+            browser.page,
+            fields,
+            profile.resume_path
+        )
+
+        await browser.check_consent()
+
+        invalid_count = await browser.page.locator(
+            ":invalid"
+        ).count()
+
+        if invalid_count > 0:
+
+            return {
+                "status": "validation_failed",
+                "invalid_fields": invalid_count,
+                "fields": results
+            }
+
+        submitted = await browser.submit()
+
+        if not submitted:
+
+            return {
+                "status": "submit_button_not_found",
+                "fields": results
+            }
+
         application = Application(
             profile_id=profile_id,
             job_url=url,
             application_url=url,
-            status="form_analyzed"
+            status="submitted"
         )
 
         db.add(application)
         db.commit()
 
         return {
-            "status": "form_analyzed",
-            "fields": fields
+            "status": "submitted",
+            "message": "Application submitted successfully",
+            "fields": results
         }
 
     except Exception as e:
@@ -136,3 +166,7 @@ async def apply_to_job(
             "status": "failed",
             "error": str(e)
         }
+
+    finally:
+
+        await browser.close()
