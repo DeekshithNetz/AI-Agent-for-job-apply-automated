@@ -2,13 +2,24 @@ import sys
 import asyncio
 
 if sys.platform == "win32":
+
     asyncio.set_event_loop_policy(
         asyncio.WindowsProactorEventLoopPolicy()
     )
-from fastapi import FastAPI, Depends
+
+
+from fastapi import (
+    FastAPI,
+    Depends
+)
+
 from sqlalchemy.orm import Session
 
-from app.database import Base, engine, get_db
+from app.database import (
+    Base,
+    engine,
+    get_db
+)
 
 from app.models.profile import Profile
 from app.models.application import Application
@@ -16,24 +27,51 @@ from app.models.application import Application
 from app.schemas.profile import ProfileCreate
 
 from app.browser.browser import Browser
-from app.agents.form_agent import analyze_form, execute_form
+
+from app.agents.form_agent import (
+    analyze_form,
+    execute_form
+)
+
+from app.agents.application_agent import (
+    run_application
+)
 
 
-Base.metadata.create_all(bind=engine)
+# =========================================================
+# DATABASE
+# =========================================================
 
+Base.metadata.create_all(
+    bind=engine
+)
+
+
+# =========================================================
+# FASTAPI
+# =========================================================
 
 app = FastAPI(
     title="AI Internship Application Agent"
 )
 
 
+# =========================================================
+# ROOT
+# =========================================================
+
 @app.get("/")
 async def root():
 
     return {
-        "message": "AI Internship Agent running"
+        "message":
+            "AI Internship Agent running"
     }
 
+
+# =========================================================
+# CREATE PROFILE
+# =========================================================
 
 @app.post("/profile")
 async def create_profile(
@@ -42,30 +80,57 @@ async def create_profile(
 ):
 
     new_profile = Profile(
+
         name=profile.name,
+
         email=profile.email,
+
         phone=profile.phone,
+
         location=profile.location,
+
         degree=profile.degree,
+
         university=profile.university,
+
         graduation_year=profile.graduation_year,
+
         skills=profile.skills,
+
         projects=profile.projects,
+
         experience=profile.experience,
+
         github=profile.github,
+
         linkedin=profile.linkedin,
+
         portfolio=profile.portfolio
     )
 
-    db.add(new_profile)
+    db.add(
+        new_profile
+    )
+
     db.commit()
-    db.refresh(new_profile)
+
+    db.refresh(
+        new_profile
+    )
 
     return {
-        "profile_id": new_profile.id,
-        "message": "Profile created"
+
+        "profile_id":
+            new_profile.id,
+
+        "message":
+            "Profile created"
     }
 
+
+# =========================================================
+# APPLY TO JOB
+# =========================================================
 
 @app.post("/agent/apply")
 async def apply_to_job(
@@ -74,109 +139,157 @@ async def apply_to_job(
     db: Session = Depends(get_db)
 ):
 
-    profile = db.query(Profile).filter(
+    # =====================================================
+    # GET PROFILE
+    # =====================================================
+
+    profile = db.query(
+        Profile
+    ).filter(
         Profile.id == profile_id
     ).first()
 
     if not profile:
+
         return {
             "status": "failed",
             "error": "Profile not found"
         }
 
+    # =====================================================
+    # PROFILE DATA FOR AI
+    # =====================================================
+
     profile_data = {
-        "name": profile.name,
-        "email": profile.email,
-        "phone": profile.phone,
-        "location": profile.location,
-        "degree": profile.degree,
-        "university": profile.university,
-        "graduation_year": profile.graduation_year,
-        "skills": profile.skills,
-        "projects": profile.projects,
-        "experience": profile.experience,
-        "github": profile.github,
-        "linkedin": profile.linkedin,
-        "portfolio": profile.portfolio
+
+        "name":
+            profile.name,
+
+        "email":
+            profile.email,
+
+        "phone":
+            profile.phone,
+
+        "location":
+            profile.location,
+
+        "degree":
+            profile.degree,
+
+        "university":
+            profile.university,
+
+        "graduation_year":
+            profile.graduation_year,
+
+        "skills":
+            profile.skills,
+
+        "projects":
+            profile.projects,
+
+        "experience":
+            profile.experience,
+
+        "github":
+            profile.github,
+
+        "linkedin":
+            profile.linkedin,
+
+        "portfolio":
+            profile.portfolio
     }
 
     browser = Browser()
 
     try:
 
+        # =================================================
+        # START BROWSER
+        # =================================================
+
         await browser.start()
 
-        await browser.open(url)
-
-        page_content = await browser.get_page_content()
-
-        fields = await analyze_form(
-            page_content,
-            profile_data
-        )
-        print("3333333333333333333333333333")
-        print("FILE INPUTS:", await browser.page.locator('input[type="file"]').count())
-
-        print(
-            "ALL INPUTS:",
-            await browser.page.locator("input").count()
+        await browser.open(
+            url
         )
 
-        print(
-            "BUTTONS:",
-            await browser.page.locator("button").all_text_contents()
+        # =================================================
+        # PAGE ANALYZER
+        # =================================================
+
+        async def analyze_current_page():
+
+            page_content = (
+                await browser.get_page_content()
+            )
+
+            return await analyze_form(
+                page_content,
+                profile_data
+            )
+
+        # =================================================
+        # RUN APPLICATION AGENT
+        # =================================================
+
+        result = await run_application(
+
+            page=browser.page,
+
+            analyze_page=analyze_current_page,
+
+            execute_form=execute_form,
+
+            resume_path=profile.resume_path,
+
+            max_steps=10
         )
 
-        results = await execute_form(
-            browser.page,
-            fields,
-            profile.resume_path
-        )
+        # =================================================
+        # SAVE APPLICATION
+        # =================================================
 
-        await browser.check_consent()
+        if result.get("status") == "submitted":
 
-        invalid_count = await browser.page.locator(
-            ":invalid"
-        ).count()
+            application = Application(
 
-        if invalid_count > 0:
+                profile_id=
+                    profile_id,
 
-            return {
-                "status": "validation_failed",
-                "invalid_fields": invalid_count,
-                "fields": results
-            }
+                job_url=
+                    url,
 
-        submitted = await browser.submit()
+                application_url=
+                    url,
 
-        if not submitted:
+                status=
+                    "submitted"
+            )
 
-            return {
-                "status": "submit_button_not_found",
-                "fields": results
-            }
+            db.add(
+                application
+            )
 
-        application = Application(
-            profile_id=profile_id,
-            job_url=url,
-            application_url=url,
-            status="submitted"
-        )
+            db.commit()
 
-        db.add(application)
-        db.commit()
+        # =================================================
+        # RETURN RESULT
+        # =================================================
 
-        return {
-            "status": "submitted",
-            "message": "Application submitted successfully",
-            "fields": results
-        }
+        return result
 
     except Exception as e:
 
         return {
-            "status": "failed",
-            "error": str(e)
+
+            "status":
+                "failed",
+
+            "error":
+                str(e)
         }
 
     finally:
