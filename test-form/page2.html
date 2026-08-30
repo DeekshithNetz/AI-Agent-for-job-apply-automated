@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Internship Application - Page 2</title>
+</head>
+
+<body>
+
+<h1>Internship Application</h1>
+
+<form action="page3.html">
+
+    <label for="skills">
+        Technical Skills
+    </label>
+
+    <select
+        id="skills"
+        name="skills"
+        multiple
+        required
+    >
+        <option value="python">Python</option>
+        <option value="fastapi">FastAPI</option>
+        <option value="react">React</option>
+        <option value="typescript">TypeScript</option>
+        <option value="postgresql">PostgreSQL</option>
+        <option value="docker">Docker</option>
+        <option value="machine-learning">
+            Machine Learning
+        </option>
+    </select>
+
+    <br><br>
+
+    <label for="cover_letter">
+        Cover Letter
+    </label>
+
+    <br>
+
+    <textarea
+        id="cover_letter"
+        name="cover_letter"
+        rows="8"
+        cols="50"
+        required
+    ></textarea>
+
+    <br><br>
+
+    <label for="resume">
+        Upload CV/Resume
+    </label>
+
+    <input
+        type="file"
+        id="resume"
+        name="resume"
+        accept=".pdf"
+        required
+    >
+
+    <br><br>
+
+    <label>
+        <input
+            type="checkbox"
+            name="terms"
+            required
+        >
+
+        I agree to the storage and handling
+        of my application data.
+    </label>
+
+    <br><br>
+
+    <button type="submit">
+        Continue
+    </button>
+
+</form>
+
+</body>
+</html>

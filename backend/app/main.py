@@ -225,6 +225,7 @@ async def apply_to_job(
             page_content = (
                 await browser.get_page_content()
             )
+            print("content",page_content)
 
             return await analyze_form(
                 page_content,

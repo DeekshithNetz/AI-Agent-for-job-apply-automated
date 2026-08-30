@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Internship Application - Page 1</title>
+</head>
+
+<body>
+
+<h1>Internship Application</h1>
+
+<form action="page2.html">
+
+    <label for="name">Full Name</label>
+    <input
+        type="text"
+        id="name"
+        name="name"
+        required
+    >
+
+    <br><br>
+
+    <label for="email">Email</label>
+    <input
+        type="email"
+        id="email"
+        name="email"
+        required
+    >
+
+    <br><br>
+
+    <label for="phone">Phone</label>
+    <input
+        type="tel"
+        id="phone"
+        name="phone"
+        required
+    >
+
+    <br><br>
+
+    <label for="education">
+        Highest Education
+    </label>
+
+    <select
+        id="education"
+        name="education"
+        required
+    >
+        <option value="">Select education</option>
+        <option value="bca">BCA</option>
+        <option value="btech">B.Tech</option>
+        <option value="mca">
+            Master of Computer Applications
+        </option>
+        <option value="mtech">M.Tech</option>
+    </select>
+
+    <br><br>
+
+    <p>Gender</p>
+
+    <label>
+        <input
+            type="radio"
+            name="gender"
+            value="male"
+            
+        >
+        Male
+    </label>
+
+    <label>
+        <input
+            type="radio"
+            name="gender"
+            value="female"
+        >
+        Female
+    </label>
+
+    <label>
+        <input
+            type="radio"
+            name="gender"
+            value="other"
+        >
+        Other
+    </label>
+
+    <br><br>
+
+    <button type="submit">
+        Next
+    </button>
+
+</form>
+
+</body>
+</html>
