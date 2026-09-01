@@ -9,18 +9,21 @@ class Browser:
         self.page = None
 
     async def start(self):
+
         self.playwright = await async_playwright().start()
 
-        self.browser = await self.playwright.chromium.launch(
-            headless=False
+        self.browser = await self.playwright.chromium.connect_over_cdp(
+            "http://127.0.0.1:9222"
         )
 
-        self.page = await self.browser.new_page(
-            viewport={
-                "width": 1440,
-                "height": 900
-            }
-        )
+        context = self.browser.contexts[0]
+
+        self.page = await context.new_page()
+
+        await self.page.set_viewport_size({
+            "width": 1440,
+            "height": 900
+        })
 
     async def open(self, url: str):
         await self.page.goto(
@@ -257,8 +260,8 @@ class Browser:
 
     async def close(self):
 
-        if self.browser:
-            await self.browser.close()
+        self.page = None
 
         if self.playwright:
             await self.playwright.stop()
+            self.playwright = None
