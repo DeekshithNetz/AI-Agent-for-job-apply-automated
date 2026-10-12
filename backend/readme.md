@@ -26,7 +26,7 @@ Open **Command Prompt (CMD)** and run:
 If Chrome is installed in `Program Files (x86)`, use:
 
 ```cmd
-"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="%TEMP%\chrome-debug"
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="%TEMP%\chrome-debug"
 ```
 
 > **Note:** This starts Chrome using a separate `chrome-debug` profile. Log in to the required websites inside this Chrome profile.

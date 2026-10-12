@@ -1,11 +1,12 @@
 import asyncio
-from google import genai
+from openai import AsyncOpenAI
 
 from app.config import settings
 
 
-client = genai.Client(
-    api_key=settings.GEMINI_API_KEY
+client = AsyncOpenAI(
+    api_key=settings.GROQ_API_KEY,
+    base_url="https://api.groq.com/openai/v1"
 )
 
 
@@ -14,12 +15,17 @@ async def ask_ai(prompt: str):
     for attempt in range(3):
 
         try:
-            response = await client.aio.models.generate_content(
-                model="gemini-3.6-flash",
-                contents=prompt
+            response = await client.chat.completions.create(
+                model="openai/gpt-oss-120b",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
             )
 
-            return response.text
+            return response.choices[0].message.content
 
         except Exception as e:
 

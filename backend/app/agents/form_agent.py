@@ -70,6 +70,7 @@ Rules:
     the candidate's real profile, projects and experience.
 14. confidence must be between 0 and 1.
 15. Return JSON only.
+16.If the question is not related to the profile and if the quiz appears then also answer in the same format 
 """
 
     result = await ask_ai(prompt)
